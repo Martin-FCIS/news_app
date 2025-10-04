@@ -7,7 +7,15 @@ class NewsViewModel extends ChangeNotifier {
   List<Articles>articles = [];
   List<Source>sources=[];
   bool isLoading=false;
+  int selectedindex=0;
+void onTab(int value){
+  selectedindex = value;
+  getNews(sources[value].id ?? "");
+}
+Future<void>onRefresh(){
+  return getNews(sources[selectedindex].id ?? "");
 
+}
   Future<void> getNews(String source) async {
     isLoading=true;
     notifyListeners();
