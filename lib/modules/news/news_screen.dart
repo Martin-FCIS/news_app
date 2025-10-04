@@ -1,17 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:news_app/api_manager/api_manager.dart';
-import 'package:news_app/api_manager/models/articles_model.dart';
 import 'package:news_app/modules/home/model/app_category.dart';
+import 'package:news_app/modules/news/view_model/news_view_model.dart';
+import 'package:provider/provider.dart';
 
-class NewsScreen extends StatefulWidget {
-  const NewsScreen({super.key});
+class NewsScreen extends StatelessWidget {
+  NewsScreen({super.key});
 
-  @override
-  State<NewsScreen> createState() => _NewsScreenState();
-}
-
-class _NewsScreenState extends State<NewsScreen> {
   int selectedindex = 0;
 
   @override
@@ -19,19 +14,18 @@ class _NewsScreenState extends State<NewsScreen> {
     AppCategory category =
         ModalRoute.of(context)!.settings.arguments as AppCategory;
     var theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(category.categoryName),
-      ),
-      body: FutureBuilder(
-        future: ApiManager.getSources(category.categoryId),
-        builder: (context, snapshot) {
-          if (snapshot.hasData) {
-            List<Source> sources = snapshot.data ?? [];
+    return ChangeNotifierProvider(
+      create: (context) => NewsViewModel()..getSources(category.categoryId),
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(category.categoryName),
+        ),
+        body: Consumer<NewsViewModel>(
+          builder: (context, vm, child) {
             return Column(
               children: [
                 DefaultTabController(
-                  length: sources.length,
+                  length: vm.sources.length,
                   child: TabBar(
                     tabAlignment: TabAlignment.start,
                     isScrollable: true,
@@ -39,7 +33,7 @@ class _NewsScreenState extends State<NewsScreen> {
                     indicatorColor: theme.primaryColorLight,
                     labelColor: theme.primaryColorLight,
                     unselectedLabelColor: theme.primaryColorLight,
-                    tabs: sources.map(
+                    tabs: vm.sources.map(
                       (e) {
                         return Tab(
                           text: e.name ?? "",
@@ -48,20 +42,16 @@ class _NewsScreenState extends State<NewsScreen> {
                     ).toList(),
                     onTap: (value) {
                       selectedindex = value;
-                      setState(() {});
+                      vm.getNews(vm.sources[value].id ?? "");
                     },
                   ),
                 ),
-                Expanded(
-                  child: FutureBuilder(
-                    future: ApiManager.getNews(sources[selectedindex].id ?? ""),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Center(child: CircularProgressIndicator());
-                      } else if (snapshot.hasData) {
-                        List<Articles> articles = snapshot.data ?? [];
-                        return ListView.builder(
-                          itemCount: articles.length,
+                vm.isLoading
+                    ? Expanded(
+                        child: Center(child: CircularProgressIndicator()))
+                    : Expanded(
+                        child: ListView.builder(
+                          itemCount: vm.articles.length,
                           itemBuilder: (context, index) {
                             return Padding(
                               padding: const EdgeInsets.all(8.0),
@@ -81,15 +71,18 @@ class _NewsScreenState extends State<NewsScreen> {
                                             borderRadius:
                                                 BorderRadius.circular(10),
                                             child: Image.network(
-                                              articles[index].urlToImage ?? "",
+                                              vm.articles[index].urlToImage ??
+                                                  "",
                                               fit: BoxFit.cover,
                                               width: double.infinity,
-                                              loadingBuilder: (context, child, loadingProgress) {
-                                                if(loadingProgress==null){
+                                              loadingBuilder: (context, child,
+                                                  loadingProgress) {
+                                                if (loadingProgress == null) {
                                                   return child;
-                                                }
-                                                else{
-                                                  return Center(child: CircularProgressIndicator());
+                                                } else {
+                                                  return Center(
+                                                      child:
+                                                          CircularProgressIndicator());
                                                 }
                                               },
                                               errorBuilder:
@@ -108,13 +101,12 @@ class _NewsScreenState extends State<NewsScreen> {
                                                       style: theme
                                                           .textTheme.bodyLarge,
                                                     )
-
                                                   ],
                                                 );
                                               },
                                             )),
                                       ),
-                                      Text(articles[index].title ?? "",
+                                      Text(vm.articles[index].title ?? "",
                                           style: theme.textTheme.bodyMedium!
                                               .copyWith(
                                                   fontWeight: FontWeight.bold)),
@@ -123,20 +115,20 @@ class _NewsScreenState extends State<NewsScreen> {
                                       ),
                                       Row(
                                         children: [
-                                          if (articles[index].author != null &&
-                                              articles[index].author != "")
+                                          if (vm.articles[index].author !=
+                                                  null &&
+                                              vm.articles[index].author != "")
                                             Container(
                                                 width: 200,
                                                 child: Text(
-                                                  "By : ${articles[index].author}",
+                                                  "By : ${vm.articles[index].author}",
                                                   style: TextStyle(
                                                       color: Colors.grey,
                                                       fontSize: 12),
                                                 )),
                                           Spacer(),
                                           Text(
-                                            "${DateFormat("H:m  d/MM/y ").format(DateTime.parse(articles[index].publishedAt ?? ""))}" ??
-                                                "",
+                                            "${DateFormat("H:m  d/MM/y ").format(DateTime.parse(vm.articles[index].publishedAt ?? ""))}",
                                             style: TextStyle(
                                                 color: Colors.grey,
                                                 fontSize: 12),
@@ -149,31 +141,12 @@ class _NewsScreenState extends State<NewsScreen> {
                               ),
                             );
                           },
-                        );
-                      } else if (snapshot.hasError) {
-                        return Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text(snapshot.error.toString(),
-                              style: TextStyle(color: Colors.white)),
-                        );
-                      } else {
-                        return Center(child: CircularProgressIndicator());
-                      }
-                    },
-                  ),
-                ),
+                        ),
+                      ),
               ],
             );
-          } else if (snapshot.hasError) {
-            return Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(snapshot.error.toString(),
-                  style: TextStyle(color: Colors.white)),
-            );
-          } else {
-            return Center(child: CircularProgressIndicator());
-          }
-        },
+          },
+        ),
       ),
     );
   }
